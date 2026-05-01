@@ -1,0 +1,66 @@
+# Build results
+bin/
+obj/
+out/
+Debug/
+Release/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Generated files
+Generated_Code/
+*.g.cs
+*.g.i.cs
+
+# Publish output
+publish/
+dist/
+
+# Configuration
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.json
+
+# Secrets
+secrets.json
+*.pfx
+*.key
+*.cer
+
+# Others
+node_modules/
+wwwroot/lib/
