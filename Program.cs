@@ -1,16 +1,17 @@
 using AutenticationWeb.API;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.OpenApi;
 using Polly;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 
 builder.Services.AddAuthentication(options =>
 {
@@ -25,16 +26,49 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidAudiences = new[] 
+        { 
+            builder.Configuration["Jwt:Audiences:Web"],
+            builder.Configuration["Jwt:Audiences:Mobile"],
+            builder.Configuration["Jwt:Audiences:Partner"],
+        },
         IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-            System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+        RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
     };
-});
 
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError($"Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation($"Token validated for user: {context.Principal?.Identity?.Name}");
+            return Task.CompletedTask;
+        }
+    };
+})
+.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme);
+
+builder.Services.Configure<CookieAuthenticationOptions>(
+    CookieAuthenticationDefaults.AuthenticationScheme,
+    options =>
+    {
+        options.LoginPath = "/Account/Login";
+    });
 
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+   
+
+});
 
 builder.Services.AddRateLimiter( rateLimiterOption =>
 {
@@ -86,10 +120,16 @@ builder.Services.AddHttpClient("ResilientClient")
     });
 
 builder.Services.AddDbContext<ApplicationDbContext>
-    (option => option.UseSqlServer("Data Source=SATTYAMMISHRA;Database=SattyamDB;Integrated Security=True;Persist Security Info=False;Pooling=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Application Name=\"SQL Server Management Studio\";Command Timeout=0"));
+    (option => option.UseSqlServer("Data Source=SATTYAMMISHRA;Database=AuthenticationDB;Integrated Security=True;Persist Security Info=False;Pooling=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Application Name=\"SQL Server Management Studio\";Command Timeout=0"));
 
 
-builder.Services.AddIdentity<IdentityUser, IdentityRole>(
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    options.User.AllowedUserNameCharacters =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
+});
+
+builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(
     option => { 
         option.Password.RequireDigit = true;
         option.Password.RequiredLength = 8;
@@ -104,7 +144,9 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
-
+// Ambiguity between two MapDefaultEndpoints definitions caused CS0121  .
+// Remove or replace the ambiguous extension call. If you need the behavior from a specific
+// assembly, resolve the duplicate type (remove one reference or use extern aliases in the project file).
 if(app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -127,7 +169,5 @@ app.UseRateLimiter();
 
 app.MapControllers()
     .RequireRateLimiting("fixed");
-
-
 
 app.Run();
