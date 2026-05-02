@@ -1,6 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace AutenticationWeb.API.Controllers
 {
@@ -10,11 +14,13 @@ namespace AutenticationWeb.API.Controllers
     {
         private readonly UserManager<IdentityUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IConfiguration _configuration;
 
-        public AccountController(UserManager<IdentityUser> userManger, RoleManager<IdentityRole> roleManager)
+        public AccountController(UserManager<IdentityUser> userManger, RoleManager<IdentityRole> roleManager, IConfiguration configuration)
         {
             _userManager = userManger;
             _roleManager = roleManager;
+            _configuration = configuration;
 
         }
 
@@ -38,6 +44,33 @@ namespace AutenticationWeb.API.Controllers
             await _userManager.AddToRoleAsync(user, role);
 
             return Ok($"User {user} registered successfully with role {role}");
+        }
+
+        [HttpPost("GetJWTToken")]
+        public async Task<IActionResult> GetJWTToken(string userName, string password, string role)
+        {
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Name, userName),
+                new Claim(ClaimTypes.Role, role)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+
+            var cred = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+
+             var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(30),
+                signingCredentials: cred
+            );
+
+
+            return Ok($"User {userName} Generated Token For  Authentication {role} with the Token {new JwtSecurityTokenHandler().WriteToken(token)}");
         }
     }
 }
