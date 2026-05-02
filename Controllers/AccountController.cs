@@ -70,7 +70,14 @@ namespace AutenticationWeb.API.Controllers
             );
 
 
-            return Ok($"User {userName} Generated Token For  Authentication {role} with the Token {new JwtSecurityTokenHandler().WriteToken(token)}");
+            var returnToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+            return Ok(new { 
+                UserName = userName,
+                Role = role,
+                OrginalTokenJson = token,
+                Token = returnToken
+            });
         }
     }
 }
