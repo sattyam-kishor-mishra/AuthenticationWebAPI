@@ -8,69 +8,74 @@ using Microsoft.Extensions.Http.Resilience;
 using Microsoft.OpenApi;
 using Polly;
 using System.Threading.RateLimiting;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+
 
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options => {         
-    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudiences = new[] 
-        { 
-            builder.Configuration["Jwt:Audiences:Web"],
-            builder.Configuration["Jwt:Audiences:Mobile"],
-            builder.Configuration["Jwt:Audiences:Partner"],
-        },
-        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-            System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
-        RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
+        ValidAudience = builder.Configuration["Jwt:Audiences:Web"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+        //RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
     };
 
-    options.Events = new JwtBearerEvents
-    {
-        OnAuthenticationFailed = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError($"Authentication failed: {context.Exception.Message}");
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation($"Token validated for user: {context.Principal?.Identity?.Name}");
-            return Task.CompletedTask;
-        }
-    };
-})
-.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme);
-
-builder.Services.Configure<CookieAuthenticationOptions>(
-    CookieAuthenticationDefaults.AuthenticationScheme,
-    options =>
-    {
-        options.LoginPath = "/Account/Login";
-    });
-
-builder.Services.AddEndpointsApiExplorer();
-
-builder.Services.AddSwaggerGen(c =>
-{
-   
-
+    //options.Events = new JwtBearerEvents
+    //{
+    //    OnAuthenticationFailed = context =>
+    //    {
+    //        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+    //        logger.LogError($"Authentication failed: {context.Exception.Message}");
+    //        return Task.CompletedTask;
+    //    },
+    //    OnTokenValidated = context =>
+    //    {
+    //        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+    //        logger.LogInformation($"Token validated for user: {context.Principal?.Identity?.Name}");
+    //        return Task.CompletedTask;
+    //    }
+    //};
 });
+//.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme);
 
-builder.Services.AddRateLimiter( rateLimiterOption =>
+//builder.Services.Configure<CookieAuthenticationOptions>(
+//    CookieAuthenticationDefaults.AuthenticationScheme,
+//    options =>
+//    {
+//        options.LoginPath = "/Account/Login";
+//    });
+
+//builder.Services.AddAuthorization(options =>
+//{
+//    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+//    options.AddPolicy("UserOnly", policy => policy.RequireRole("User"));
+//    options.AddPolicy("AnyAuthenticated", policy => policy.RequireAuthenticatedUser());
+//});
+
+builder.Services.AddAuthorization();
+
+
+
+builder.Services.AddRateLimiter(rateLimiterOption =>
 {
     rateLimiterOption.AddFixedWindowLimiter("fixed", option =>
     {
@@ -102,8 +107,8 @@ builder.Services.AddRateLimiter( rateLimiterOption =>
 builder.Services.AddHttpClient("ResilientClient")
     .AddResilienceHandler("my-pipeline", pipeline =>
     {
-        pipeline.AddRetry(new HttpRetryStrategyOptions 
-        { 
+        pipeline.AddRetry(new HttpRetryStrategyOptions
+        {
             MaxRetryAttempts = 5,
             Delay = TimeSpan.FromSeconds(2),
         });
@@ -140,7 +145,7 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
-builder.Services.AddControllers();
+
 
 var app = builder.Build();
 
@@ -165,9 +170,9 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-app.UseRateLimiter();
+//app.UseRateLimiter();
 
-app.MapControllers()
-    .RequireRateLimiting("fixed");
+app.MapControllers();
+    //.RequireRateLimiting("fixed");
 
 app.Run();

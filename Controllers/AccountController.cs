@@ -16,12 +16,14 @@ namespace AutenticationWeb.API.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<AccountController> _logger;
 
         public AccountController(UserManager<ApplicationUser> userManger, RoleManager<ApplicationRole> roleManager, IConfiguration configuration)
         {
             _userManager = userManger;
             _roleManager = roleManager;
             _configuration = configuration;
+
 
         }
 
@@ -102,9 +104,9 @@ namespace AutenticationWeb.API.Controllers
 
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                //new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                //new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
 
             // Add all roles as claims
@@ -126,11 +128,7 @@ namespace AutenticationWeb.API.Controllers
 
             var returnToken = new JwtSecurityTokenHandler().WriteToken(token);
 
-            return Ok(new { 
-                UserName = user.UserName,
-                Roles = roles,                
-                Token = returnToken
-            });
+            return Ok($"Bearer {returnToken}");
         }
     }
 }
